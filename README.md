@@ -1,3 +1,14 @@
+# YOLOv3 Face Mask Detection
+This repository is forked from https://github.com/eriklindernoren/PyTorch-YOLOv3.
+
+## Data Preparation
+Download AIZOO data from [AIZOO](https://cloud.tsinghua.edu.cn/d/af356cf803894d65b447/?p=%2FAIZOO&mode=list).
+
+Edit the root_path in [custom.data](config/custom.data).
+
+Edit the val/test_00000306.xml because the class name in it is false.
+
+-----------------------------------
 # PyTorch-YOLOv3
 A minimal PyTorch implementation of YOLOv3, with support for training, inference and evaluation.
 

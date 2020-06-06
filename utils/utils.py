@@ -20,7 +20,7 @@ def load_classes(path):
     Loads class labels at 'path'
     """
     fp = open(path, "r")
-    names = fp.read().split("\n")[:-1]
+    names = fp.read().split("\n")
     return names
 
 
@@ -111,6 +111,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
     p, r, ap = np.array(p), np.array(r), np.array(ap)
     f1 = 2 * p * r / (p + r + 1e-16)
 
+    # TODO: 这里需要修改返回值，precision_curve,recall_curve来画曲线
     return p, r, ap, f1, unique_classes.astype("int32")
 
 
@@ -318,4 +319,7 @@ def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
     iou_scores[b, best_n, gj, gi] = bbox_iou(pred_boxes[b, best_n, gj, gi], target_boxes, x1y1x2y2=False)
 
     tconf = obj_mask.float()
+
+    obj_mask=obj_mask.bool() # convert int8 to bool
+    noobj_mask=noobj_mask.bool() #convert int8 to bool
     return iou_scores, class_mask, obj_mask, noobj_mask, tx, ty, tw, th, tcls, tconf

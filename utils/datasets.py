@@ -4,6 +4,8 @@ import os
 import sys
 import numpy as np
 from PIL import Image
+import cv2
+import xml.etree.ElementTree as ED
 import torch
 import torch.nn.functional as F
 
@@ -57,14 +59,10 @@ class ImageFolder(Dataset):
 
 
 class ListDataset(Dataset):
-    def __init__(self, list_path, img_size=416, augment=True, multiscale=True, normalized_labels=True):
-        with open(list_path, "r") as file:
-            self.img_files = file.readlines()
-
-        self.label_files = [
-            path.replace("images", "labels").replace(".png", ".txt").replace(".jpg", ".txt")
-            for path in self.img_files
-        ]
+    def __init__(self, root_path, list_path, img_size=416, augment=True, multiscale=True, normalized_labels=True):
+        
+        self.root_path=root_path
+        self.img_ids = [i_id.strip() for i_id in open(list_path)]
         self.img_size = img_size
         self.max_objects = 100
         self.augment = augment
@@ -74,16 +72,47 @@ class ListDataset(Dataset):
         self.max_size = self.img_size + 3 * 32
         self.batch_count = 0
 
+    def load_images(self,idx):
+        image_name = self.img_ids[idx]+'.jpg'
+        image_path = os.path.join(self.root_path,image_name)
+        img = cv2.imread(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        return img.astype(np.float32) / 255.
+
+    def load_labels(self,idx):
+        annotations = np.zeros((0, 5))
+
+        label_name = self.img_ids[idx]+'.xml'
+        label_path = os.path.join(self.root_path,label_name)
+        tree = ED.ElementTree(file=label_path)
+        objects = tree.findall('object')
+
+        for obj in objects:
+            bndbox = obj.find('bndbox')
+            annotation = np.zeros((1,5))
+            annotation[0,0] = self.class2num(str(obj.find('name').text))
+            annotation[0,1] = int(bndbox.find('xmin').text)
+            annotation[0,2] = int(bndbox.find('ymin').text)
+            annotation[0,3] = int(bndbox.find('xmax').text)
+            annotation[0,4] = int(bndbox.find('ymax').text)
+
+            annotations = np.append(annotations,annotation,axis=0)
+
+        return annotations
+
+    def class2num(self,cl):
+        c2n = {'face_mask':0,'face':1}
+        return c2n[cl]
+
     def __getitem__(self, index):
 
         # ---------
         #  Image
         # ---------
 
-        img_path = self.img_files[index % len(self.img_files)].rstrip()
-
         # Extract image as PyTorch tensor
-        img = transforms.ToTensor()(Image.open(img_path).convert('RGB'))
+        img = transforms.ToTensor()(self.load_images(index))
 
         # Handle images with less than three channels
         if len(img.shape) != 3:
@@ -100,36 +129,29 @@ class ListDataset(Dataset):
         #  Label
         # ---------
 
-        label_path = self.label_files[index % len(self.img_files)].rstrip()
-
         targets = None
-        if os.path.exists(label_path):
-            boxes = torch.from_numpy(np.loadtxt(label_path).reshape(-1, 5))
-            # Extract coordinates for unpadded + unscaled image
-            x1 = w_factor * (boxes[:, 1] - boxes[:, 3] / 2)
-            y1 = h_factor * (boxes[:, 2] - boxes[:, 4] / 2)
-            x2 = w_factor * (boxes[:, 1] + boxes[:, 3] / 2)
-            y2 = h_factor * (boxes[:, 2] + boxes[:, 4] / 2)
-            # Adjust for added padding
-            x1 += pad[0]
-            y1 += pad[2]
-            x2 += pad[1]
-            y2 += pad[3]
-            # Returns (x, y, w, h)
-            boxes[:, 1] = ((x1 + x2) / 2) / padded_w
-            boxes[:, 2] = ((y1 + y2) / 2) / padded_h
-            boxes[:, 3] *= w_factor / padded_w
-            boxes[:, 4] *= h_factor / padded_h
+        boxes = torch.from_numpy(self.load_labels(index))
+        # Adjust for added padding
+        x1,y1,x2,y2 = boxes[:,1],boxes[:,2],boxes[:,3],boxes[:,4]
+        x1 += pad[0]
+        y1 += pad[2]
+        x2 += pad[1]
+        y2 += pad[3]
+        # Returns (x, y, w, h)
+        boxes[:, 1] = ((x1 + x2) / 2) / padded_w
+        boxes[:, 2] = ((y1 + y2) / 2) / padded_h
+        boxes[:, 3] = (x2-x1)/padded_w
+        boxes[:, 4] = (y2-y1)/padded_h
 
-            targets = torch.zeros((len(boxes), 6))
-            targets[:, 1:] = boxes
+        targets = torch.zeros((len(boxes), 6))
+        targets[:, 1:] = boxes
 
         # Apply augmentations
         if self.augment:
             if np.random.random() < 0.5:
                 img, targets = horisontal_flip(img, targets)
 
-        return img_path, img, targets
+        return _, img, targets
 
     def collate_fn(self, batch):
         paths, imgs, targets = list(zip(*batch))
@@ -148,4 +170,4 @@ class ListDataset(Dataset):
         return paths, imgs, targets
 
     def __len__(self):
-        return len(self.img_files)
+        return len(self.img_ids)

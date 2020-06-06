@@ -50,6 +50,9 @@ if __name__ == "__main__":
     data_config = parse_data_config(opt.data_config)
     train_path = data_config["train"]
     valid_path = data_config["valid"]
+
+    root = data_config['root']
+    test_root = data_config["test_root"]
     class_names = load_classes(data_config["names"])
 
     # Initiate model
@@ -64,7 +67,7 @@ if __name__ == "__main__":
             model.load_darknet_weights(opt.pretrained_weights)
 
     # Get dataloader
-    dataset = ListDataset(train_path, augment=True, multiscale=opt.multiscale_training)
+    dataset = ListDataset(root,train_path, augment=True, multiscale=opt.multiscale_training)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=opt.batch_size,
@@ -87,7 +90,8 @@ if __name__ == "__main__":
         "cls",
         "cls_acc",
         "recall50",
-        "recall75",
+        "recall70",
+        "recall90",
         "precision",
         "conf_obj",
         "conf_noobj",
@@ -147,11 +151,15 @@ if __name__ == "__main__":
 
             model.seen += imgs.size(0)
 
+        if epoch % opt.checkpoint_interval == 0:
+            torch.save(model.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)
+
         if epoch % opt.evaluation_interval == 0:
             print("\n---- Evaluating Model ----")
             # Evaluate the model on the validation set
             precision, recall, AP, f1, ap_class = evaluate(
                 model,
+                root_path=root,
                 path=valid_path,
                 iou_thres=0.5,
                 conf_thres=0.5,
@@ -173,6 +181,3 @@ if __name__ == "__main__":
                 ap_table += [[c, class_names[c], "%.5f" % AP[i]]]
             print(AsciiTable(ap_table).table)
             print(f"---- mAP {AP.mean()}")
-
-        if epoch % opt.checkpoint_interval == 0:
-            torch.save(model.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)

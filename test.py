@@ -20,13 +20,13 @@ from torch.autograd import Variable
 import torch.optim as optim
 
 
-def evaluate(model, path, iou_thres, conf_thres, nms_thres, img_size, batch_size):
+def evaluate(model, root_path, path, iou_thres, conf_thres, nms_thres, img_size, batch_size):
     model.eval()
 
     # Get dataloader
-    dataset = ListDataset(path, img_size=img_size, augment=False, multiscale=False)
+    dataset = ListDataset(root_path, path, img_size=img_size, augment=False, multiscale=False)
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=dataset.collate_fn
+        dataset, batch_size=batch_size, shuffle=False, num_workers=8, collate_fn=dataset.collate_fn
     )
 
     Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
@@ -64,17 +64,24 @@ if __name__ == "__main__":
     parser.add_argument("--weights_path", type=str, default="weights/yolov3.weights", help="path to weights file")
     parser.add_argument("--class_path", type=str, default="data/coco.names", help="path to class label file")
     parser.add_argument("--iou_thres", type=float, default=0.5, help="iou threshold required to qualify as detected")
-    parser.add_argument("--conf_thres", type=float, default=0.001, help="object confidence threshold")
+    parser.add_argument("--conf_thres", type=float, default=0.5, help="object confidence threshold")
     parser.add_argument("--nms_thres", type=float, default=0.5, help="iou thresshold for non-maximum suppression")
     parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
     parser.add_argument("--img_size", type=int, default=416, help="size of each image dimension")
+    parser.add_argument("--mode", type=str, default='val', help="eval or test")
     opt = parser.parse_args()
     print(opt)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     data_config = parse_data_config(opt.data_config)
-    valid_path = data_config["valid"]
+    if opt.mode=='val':
+        valid_path = data_config["valid"]
+        root = data_config["root"]
+    else:
+        valid_path = data_config["test"]
+        root = data_config["test_root"]
+
     class_names = load_classes(data_config["names"])
 
     # Initiate model
@@ -90,6 +97,7 @@ if __name__ == "__main__":
 
     precision, recall, AP, f1, ap_class = evaluate(
         model,
+        root_path=root,
         path=valid_path,
         iou_thres=opt.iou_thres,
         conf_thres=opt.conf_thres,

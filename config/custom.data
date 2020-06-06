@@ -1,4 +1,7 @@
-classes= 1
-train=data/custom/train.txt
-valid=data/custom/valid.txt
+classes= 2
+root=/Extra/zhangmeng/face_mask_detection/AIZOO/train
+test_root=/Extra/zhangmeng/face_mask_detection/AIZOO/val
+train=imagesets/train_split.txt
+valid=imagesets/val_split.txt
+test=imagesets/test_split.txt
 names=data/custom/classes.names
