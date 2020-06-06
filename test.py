@@ -11,6 +11,8 @@ import time
 import datetime
 import argparse
 import tqdm
+import numpy as np
+import matplotlib.pyplot as plt
 
 import torch
 from torch.utils.data import DataLoader
@@ -51,9 +53,9 @@ def evaluate(model, root_path, path, iou_thres, conf_thres, nms_thres, img_size,
 
     # Concatenate sample statistics
     true_positives, pred_scores, pred_labels = [np.concatenate(x, 0) for x in list(zip(*sample_metrics))]
-    precision, recall, AP, f1, ap_class = ap_per_class(true_positives, pred_scores, pred_labels, labels)
+    precision, recall, AP, f1, ap_class, pre_cur, rec_cur = ap_per_class(true_positives, pred_scores, pred_labels, labels)
 
-    return precision, recall, AP, f1, ap_class
+    return precision, recall, AP, f1, ap_class, pre_cur, rec_cur
 
 
 if __name__ == "__main__":
@@ -95,19 +97,61 @@ if __name__ == "__main__":
 
     print("Compute mAP...")
 
-    precision, recall, AP, f1, ap_class = evaluate(
-        model,
-        root_path=root,
-        path=valid_path,
-        iou_thres=opt.iou_thres,
-        conf_thres=opt.conf_thres,
-        nms_thres=opt.nms_thres,
-        img_size=opt.img_size,
-        batch_size=8,
-    )
+    mAP = []
+    pre = []
+    rec = []
+    all_mAP_0 = []
+    all_mAP_1 = []
+    for i,iou in enumerate(np.arange(0.5,0.95,0.05)):
+        precision, recall, AP, f1, ap_class, pre_cur, rec_cur = evaluate(
+            model,
+            root_path=root,
+            path=valid_path,
+            iou_thres=iou,
+            conf_thres=opt.conf_thres,
+            nms_thres=opt.nms_thres,
+            img_size=opt.img_size,
+            batch_size=8,
+        )
+        all_mAP_0.append(AP[0])
+        all_mAP_1.append(AP[1])
+        if i == 0 or i==4 or i==8:
+            mAP.append(AP)
+            pre.append(pre_cur)
+            rec.append(rec_cur)
 
-    print("Average Precisions:")
-    for i, c in enumerate(ap_class):
-        print(f"+ Class '{c}' ({class_names[c]}) - AP: {AP[i]}")
+    os.makedirs("output/yolov3", exist_ok=True)
+    for i,cl in enumerate(ap_class):
+        pre_5 = pre[0][i]
+        pre_5 = np.concatenate([pre_5,[0]],axis=0)
+        pre_7 = pre[1][i]
+        pre_7 = np.concatenate([pre_7,[0]],axis=0)
+        pre_9 = pre[2][i]
+        pre_9 = np.concatenate([pre_9,[0]],axis=0)
+        rec_5 = rec[0][i]
+        rec_5 = np.concatenate([rec_5,[rec_5[-1]]],axis=0)
+        rec_7 = rec[1][i]
+        rec_7 = np.concatenate([rec_7,[rec_7[-1]]],axis=0)
+        rec_9 = rec[2][i]
+        rec_9 = np.concatenate([rec_9,[rec_9[-1]]],axis=0)
 
-    print(f"mAP: {AP.mean()}")
+
+        plt.clf()
+        plt.plot(rec_5,pre_5,'m-',label='IoU=0.5')
+        plt.plot(rec_7,pre_7,'b-',label='IoU=0.7')
+        plt.plot(rec_9,pre_9,'c-',label='IoU=0.9')
+        plt.xlim(0,1.0)
+        plt.ylim(0,1.01)
+        plt.title(f"precision-recall curve of {class_names[cl]}")
+        plt.grid(True)
+        plt.xlabel("recall")
+        plt.ylabel("precision")
+        plt.legend(loc="lower left")
+
+        name = os.path.join('output/yolov3',f'pr_curve_{class_names[cl]}.png')
+        plt.savefig(name)
+
+    print(f'mAP50:{mAP[0]}')
+    print(f'mAP70:{mAP[1]}')
+    print(f'mAP90:{mAP[2]}')
+    print(f'mAP.5:.95:{np.array(all_mAP_0).mean()},{np.array(all_mAP_1).mean()}')

@@ -80,6 +80,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
 
     # Create Precision-Recall curve and compute AP for each class
     ap, p, r = [], [], []
+    pre_cur, rec_cur = [], []
     for c in tqdm.tqdm(unique_classes, desc="Computing AP"):
         i = pred_cls == c
         n_gt = (target_cls == c).sum()  # Number of ground truth objects
@@ -98,10 +99,12 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
 
             # Recall
             recall_curve = tpc / (n_gt + 1e-16)
+            rec_cur.append(recall_curve)
             r.append(recall_curve[-1])
 
             # Precision
             precision_curve = tpc / (tpc + fpc)
+            pre_cur.append(precision_curve)
             p.append(precision_curve[-1])
 
             # AP from recall-precision curve
@@ -111,8 +114,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
     p, r, ap = np.array(p), np.array(r), np.array(ap)
     f1 = 2 * p * r / (p + r + 1e-16)
 
-    # TODO: 这里需要修改返回值，precision_curve,recall_curve来画曲线
-    return p, r, ap, f1, unique_classes.astype("int32")
+    return p, r, ap, f1, unique_classes.astype("int32"), pre_cur, rec_cur
 
 
 def compute_ap(recall, precision):

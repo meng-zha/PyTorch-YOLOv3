@@ -102,7 +102,7 @@ class ListDataset(Dataset):
         return annotations
 
     def class2num(self,cl):
-        c2n = {'face_mask':0,'face':1}
+        c2n = {'face':0,'face_mask':1}
         return c2n[cl]
 
     def __getitem__(self, index):

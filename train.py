@@ -131,13 +131,13 @@ if __name__ == "__main__":
                 metric_table += [[metric, *row_metrics]]
 
                 # Tensorboard logging
-                tensorboard_log = []
-                for j, yolo in enumerate(model.yolo_layers):
-                    for name, metric in yolo.metrics.items():
-                        if name != "grid_size":
-                            tensorboard_log += [(f"{name}_{j+1}", metric)]
-                tensorboard_log += [("loss", loss.item())]
-                logger.list_of_scalars_summary(tensorboard_log, batches_done)
+                # tensorboard_log = []
+                # for j, yolo in enumerate(model.yolo_layers):
+                #     for name, metric in yolo.metrics.items():
+                #         if name != "grid_size":
+                #             tensorboard_log += [(f"{name}_{j+1}", metric)]
+                # tensorboard_log += [("loss", loss.item())]
+                # logger.list_of_scalars_summary(tensorboard_log, batches_done)
 
             log_str += AsciiTable(metric_table).table
             log_str += f"\nTotal loss {loss.item()}"
@@ -157,7 +157,7 @@ if __name__ == "__main__":
         if epoch % opt.evaluation_interval == 0:
             print("\n---- Evaluating Model ----")
             # Evaluate the model on the validation set
-            precision, recall, AP, f1, ap_class = evaluate(
+            precision, recall, AP, f1, ap_class, _, _ = evaluate(
                 model,
                 root_path=root,
                 path=valid_path,

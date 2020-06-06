@@ -9,6 +9,6 @@ data/coco
 backup
 weights/*.weights
 __pycache__
-checkpoints/
+checkpoints*/
 logs/
 .vscode/
