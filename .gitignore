@@ -12,3 +12,4 @@ __pycache__
 checkpoints*/
 logs/
 .vscode/
+data/samples/

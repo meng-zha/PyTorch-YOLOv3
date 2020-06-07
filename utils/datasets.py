@@ -129,8 +129,8 @@ class ListDataset(Dataset):
         #  Label
         # ---------
 
-        targets = None
         boxes = torch.from_numpy(self.load_labels(index))
+        targets = torch.zeros((len(boxes), 6))
         # Adjust for added padding
         x1,y1,x2,y2 = boxes[:,1],boxes[:,2],boxes[:,3],boxes[:,4]
         x1 += pad[0]
@@ -138,13 +138,11 @@ class ListDataset(Dataset):
         x2 += pad[1]
         y2 += pad[3]
         # Returns (x, y, w, h)
-        boxes[:, 1] = ((x1 + x2) / 2) / padded_w
-        boxes[:, 2] = ((y1 + y2) / 2) / padded_h
-        boxes[:, 3] = (x2-x1)/padded_w
-        boxes[:, 4] = (y2-y1)/padded_h
-
-        targets = torch.zeros((len(boxes), 6))
-        targets[:, 1:] = boxes
+        targets[:, 1] = boxes[:,0]
+        targets[:, 2] = ((x1 + x2) / 2) / padded_w
+        targets[:, 3] = ((y1 + y2) / 2) / padded_h
+        targets[:, 4] = (x2-x1)/padded_w
+        targets[:, 5] = (y2-y1)/padded_h
 
         # Apply augmentations
         if self.augment:
